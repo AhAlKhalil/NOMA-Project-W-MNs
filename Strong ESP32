@@ -1,0 +1,53 @@
+#include <WiFi.h>
+#include <WiFiClient.h>
+
+const char* ssid = "XXXX"; // Change to deal with yours 
+const char* password = "XXXX"; // Change to deal with yours 
+
+// Raspberry Pi server
+const char* serverIP = "xxx.xxx.xxx.xxx"; // // Change to deal with yours 
+const int serverPort = 5000;
+
+// User name
+const char* espName = "Strong ESP32";
+
+void setup() {
+  Serial.begin(115200);
+
+  WiFi.mode(WIFI_STA);
+
+  // STRONG USER → LOW TX POWER 2,4,6,7,8dbm ...
+  WiFi.setTxPower(WIFI_POWER_2dBm);
+
+  WiFi.setHostname(espName);
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\n ESP32 STRONG USER CONNECTED");
+  Serial.print("Hostname: ");
+  Serial.println(espName);
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    int rssi = WiFi.RSSI();
+
+    Serial.print("RSSI: ");
+    Serial.print(rssi);
+    Serial.println(" dBm");
+
+    WiFiClient client;
+    if (client.connect(serverIP, serverPort)) {
+      client.println(espName);
+      client.stop();
+    }
+  }
+
+  delay(100);   //u can play with it as u like 
+}
