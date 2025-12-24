@@ -1,0 +1,78 @@
+clear; clc; close all;
+
+
+% Settings
+
+Nbits   = 2e5;        % number of bits (increase for smoother curve)
+SNRdB   = 12;         % fixed SNR in dB (as in your figure)
+Pweak_v = 0.55:0.05:0.95;   % sweep weak-user power
+rng(1);               % reproducible
+
+% Generate user bits once (fair comparison across power splits)
+bStrong = randi([0 1], Nbits, 1);
+bWeak   = randi([0 1], Nbits, 1);
+
+% BPSK mapping: 0 -> -1, 1 -> +1
+sStrong = 2*bStrong - 1;
+sWeak   = 2*bWeak   - 1;
+
+% Noise variance for real BPSK: Es=1, SNR = Es/N0 => sigma^2 = N0/2
+SNRlin  = 10^(SNRdB/10);
+N0      = 1/SNRlin;
+sigma   = sqrt(N0/2);
+
+BER_weak   = zeros(size(Pweak_v));
+BER_strong = zeros(size(Pweak_v));
+
+
+% Sweep power allocation
+
+for k = 1:numel(Pweak_v)
+    Pweak   = Pweak_v(k);
+    Pstrong = 1 - Pweak;
+
+    % Superposition + AWGN
+    n = sigma * randn(Nbits,1);
+    y = sqrt(Pstrong)*sStrong + sqrt(Pweak)*sWeak + n;
+
+    % ---- Decode weak user first (higher power) ----
+    sWeak_hat = sign(y);
+    sWeak_hat(sWeak_hat==0) = 1;
+
+    bWeak_hat = (sWeak_hat + 1)/2;
+    BER_weak(k) = mean(bWeak_hat ~= bWeak);
+
+    % ---- SIC then decode strong user ----
+    y_res = y - sqrt(Pweak)*sWeak_hat;
+
+    sStrong_hat = sign(y_res);
+    sStrong_hat(sStrong_hat==0) = 1;
+
+    bStrong_hat = (sStrong_hat + 1)/2;
+    BER_strong(k) = mean(bStrong_hat ~= bStrong);
+end
+
+
+% Plot 
+
+figure('Color',[0.1 0.1 0.1]);
+ax = axes('Color',[0.1 0.1 0.1]);
+hold on; grid on; box on;
+
+plot(Pweak_v, BER_weak,   'o-','LineWidth',1.8,'MarkerSize',6);
+plot(Pweak_v, BER_strong, 's-','LineWidth',1.8,'MarkerSize',6);
+
+title(sprintf('BER vs Power Allocation at SNR = %g dB', SNRdB), ...
+      'Color','w','FontWeight','bold');
+xlabel('Power Allocation (P_{weak})','Color','w');
+ylabel('Bit Error Rate','Color','w');
+
+legend({'Weak User','Strong User (after SIC)'}, 'TextColor','w', ...
+       'Location','northwest');
+
+ax.XColor = 'w'; ax.YColor = 'w';
+ax.GridColor = [1 1 1]; ax.GridAlpha = 0.25;
+
+% Optional: match y-limits like your screenshot
+ylim([0 0.18]);
+xlim([min(Pweak_v) max(Pweak_v)]);
